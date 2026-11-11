@@ -8,7 +8,7 @@ const session = require("express-session");
 const consolidate = require("consolidate"); // Templating library adapter for Express
 const swig = require("swig");
 // const helmet = require("helmet");
-const MongoClient = require("mongodb").MongoClient; // Driver for connecting to MongoDB
+const { MongoClient } = require("mongodb"); // Driver for connecting to MongoDB
 const http = require("http");
 const marked = require("marked");
 //const nosniff = require('dont-sniff-mimetype');
@@ -27,12 +27,10 @@ const httpsOptions = {
 };
 */
 
-MongoClient.connect(db, (err, db) => {
-    if (err) {
-        console.log("Error: DB: connect");
-        console.log(err);
-        process.exit(1);
-    }
+const client = new MongoClient(db);
+
+client.connect().then(() => {
+    const database = client.db();
     console.log(`Connected to the database`);
 
     /*
@@ -129,7 +127,7 @@ MongoClient.connect(db, (err, db) => {
     app.locals.marked = marked;
 
     // Application routes
-    routes(app, db);
+    routes(app, database);
 
     // Template system setup
     swig.setDefaults({
@@ -154,4 +152,8 @@ MongoClient.connect(db, (err, db) => {
     });
     */
 
+}).catch((err) => {
+    console.log("Error: DB: connect");
+    console.log(err);
+    process.exit(1);
 });

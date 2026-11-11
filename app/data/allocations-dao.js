@@ -26,32 +26,29 @@ const AllocationsDAO = function(db){
             bonds: bonds
         };
 
-        allocationsCol.update({
+        allocationsCol.replaceOne({
             userId: parsedUserId
         }, allocations, {
             upsert: true
-        }, err => {
+        }).then(() => {
 
-            if (!err) {
+            console.log("Updated allocations");
 
-                console.log("Updated allocations");
+            userDAO.getUserById(userId, (err, user) => {
 
-                userDAO.getUserById(userId, (err, user) => {
+                if (err) return callback(err, null);
 
-                    if (err) return callback(err, null);
+                // add user details
+                allocations.userId = userId;
+                allocations.userName = user.userName;
+                allocations.firstName = user.firstName;
+                allocations.lastName = user.lastName;
 
-                    // add user details
-                    allocations.userId = userId;
-                    allocations.userName = user.userName;
-                    allocations.firstName = user.firstName;
-                    allocations.lastName = user.lastName;
+                return callback(null, allocations);
+            });
 
-                    return callback(null, allocations);
-                });
-            }
-
-            return callback(err, null);
-        });
+            return callback(null, null);
+        }, (err) => callback(err, null));
     };
 
     this.getByUserIdAndThreshold = (userId, threshold, callback) => {
@@ -83,8 +80,7 @@ const AllocationsDAO = function(db){
             };
         };
 
-        allocationsCol.find(searchCriteria()).toArray((err, allocations) => {
-            if (err) return callback(err, null);
+        allocationsCol.find(searchCriteria()).toArray().then((allocations) => {
             if (!allocations.length) return callback("ERROR: No allocations found for the user", null);
 
             let doneCounter = 0;
@@ -106,7 +102,7 @@ const AllocationsDAO = function(db){
                     }
                 });
             });
-        });
+        }, (err) => callback(err, null));
     };
 
 };

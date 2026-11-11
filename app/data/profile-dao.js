@@ -75,28 +75,21 @@ function ProfileDAO(db) {
         }
         */
 
-        users.update({
+        users.updateOne({
                 _id: parseInt(userId)
             }, {
                 $set: user
-            },
-            err => {
-                if (!err) {
-                    console.log("Updated user profile");
-                    return callback(null, user);
-                }
-
-                return callback(err, null);
             }
-        );
+        ).then(() => {
+            console.log("Updated user profile");
+            return callback(null, user);
+        }, (err) => callback(err, null));
     };
 
     this.getByUserId = (userId, callback) => {
         users.findOne({
                 _id: parseInt(userId)
-            },
-            (err, user) => {
-                if (err) return callback(err, null);
+            }).then((user) => {
                 /*
                 // Fix for A6 - Sensitive Data Exposure
                 // Decrypt ssn and DOB values to display to user
@@ -105,7 +98,7 @@ function ProfileDAO(db) {
                 */
 
                 callback(null, user);
-            }
+            }, (err) => callback(err, null)
         );
     };
 }

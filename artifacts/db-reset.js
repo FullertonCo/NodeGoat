@@ -37,14 +37,9 @@ const USERS_TO_INSERT = [
     }];
 
 const tryDropCollection = (db, name) => {
-    return new Promise((resolve, reject) => {
-        db.dropCollection(name, (err, data) => {
-            if (!err) {
-                console.log(`Dropped collection: ${name}`);
-            }
-            resolve(undefined);
-        });
-    });
+    return db.dropCollection(name).then(() => {
+        console.log(`Dropped collection: ${name}`);
+    }).catch(() => undefined);
 };
 
 const parseResponse = (err, res, comm) => {
@@ -60,12 +55,10 @@ const parseResponse = (err, res, comm) => {
 
 
 // Starting here
-MongoClient.connect(db, (err, db) =>  {
-    if (err) {
-        console.log("ERROR: connect");
-        console.log(JSON.stringify(err));
-        process.exit(1);
-    }
+const client = new MongoClient(db);
+
+client.connect().then(() => {
+    const database = client.db();
     console.log("Connected to the database");
 
     const collectionNames = [
@@ -78,38 +71,33 @@ MongoClient.connect(db, (err, db) =>  {
 
     // remove existing data (if any), we don't want to look for errors here
     console.log("Dropping existing collections");
-    const dropPromises = collectionNames.map((name) => tryDropCollection(db, name));
+    const dropPromises = collectionNames.map((name) => tryDropCollection(database, name));
 
     // Wait for all drops to finish (or fail) before continuing
     Promise.all(dropPromises).then(() => {
-        const usersCol = db.collection("users");
-        const allocationsCol = db.collection("allocations");
-        const countersCol = db.collection("counters");
+        const usersCol = database.collection("users");
+        const allocationsCol = database.collection("allocations");
+        const countersCol = database.collection("counters");
 
         // reset unique id counter
-        countersCol.insert({
+        countersCol.insertOne({
             _id: "userId",
             seq: 3
-        }, (err, data) => {
-            parseResponse(err, data, "countersCol.insert");
-        });
+        }).then(
+            (data) => parseResponse(null, data, "countersCol.insert"),
+            (err) => parseResponse(err, null, "countersCol.insert")
+        );
 
         // insert admin and test users
         console.log("Users to insert:");
         USERS_TO_INSERT.forEach((user) => console.log(JSON.stringify(user)));
 
-        usersCol.insertMany(USERS_TO_INSERT, (err, data) => {
+        usersCol.insertMany(USERS_TO_INSERT).then((data) => {
             const finalAllocations = [];
 
-            // We can't continue if error here
-            if (err) {
-                console.log("ERROR: insertMany");
-                console.log(JSON.stringify(err));
-                process.exit(1);
-            }
-            parseResponse(err, data, "users.insertMany");
+            parseResponse(null, data, "users.insertMany");
 
-            data.ops.forEach((user) => {
+            USERS_TO_INSERT.forEach((user) => {
                 const stocks = Math.floor((Math.random() * 40) + 1);
                 const funds = Math.floor((Math.random() * 40) + 1);
 
@@ -124,12 +112,19 @@ MongoClient.connect(db, (err, db) =>  {
             console.log("Allocations to insert:");
             finalAllocations.forEach(allocation => console.log(JSON.stringify(allocation)));
 
-            allocationsCol.insertMany(finalAllocations, (err, data) => {
-                parseResponse(err, data, "allocations.insertMany");
-                console.log("Database reset performed successfully");
-                process.exit(0);
-            });
-
+            return allocationsCol.insertMany(finalAllocations);
+        }).then((data) => {
+            parseResponse(null, data, "allocations.insertMany");
+            console.log("Database reset performed successfully");
+            process.exit(0);
+        }).catch((err) => {
+            console.log("ERROR: insertMany");
+            console.log(JSON.stringify(err));
+            process.exit(1);
         });
     });
+}).catch((err) => {
+    console.log("ERROR: connect");
+    console.log(JSON.stringify(err));
+    process.exit(1);
 });

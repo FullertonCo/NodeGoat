@@ -42,7 +42,10 @@ function UserDAO(db) {
             console.log(typeof(id));
 
             user._id = id;
-            usersCol.insert(user, (err, result) => !err ? callback(null, result.ops[0]) : callback(err, null));
+            usersCol.insertOne(user).then(
+                () => callback(null, user),
+                (err) => callback(err, null)
+            );
         });
     };
 
@@ -90,33 +93,45 @@ function UserDAO(db) {
 
         usersCol.findOne({
             userName: userName
-        }, validateUserDoc);
+        }).then(
+            (user) => validateUserDoc(null, user),
+            (err) => validateUserDoc(err, null)
+        );
     };
 
     // This is the good one, see the next function
     this.getUserById = (userId, callback) => {
         usersCol.findOne({
             _id: parseInt(userId)
-        }, callback);
+        }).then(
+            (user) => callback(null, user),
+            (err) => callback(err, null)
+        );
     };
 
     this.getUserByUserName = (userName, callback) => {
         usersCol.findOne({
             userName: userName
-        }, callback);
+        }).then(
+            (user) => callback(null, user),
+            (err) => callback(err, null)
+        );
     };
 
     this.getNextSequence = (name, callback) => {
-        db.collection("counters").findAndModify({
+        db.collection("counters").findOneAndUpdate({
                 _id: name
-            }, [], {
+            }, {
                 $inc: {
                     seq: 1
                 }
             }, {
-                new: true
-            },
-            (err, data) =>  err ? callback(err, null) : callback(null, data.value.seq));
+                returnDocument: "after"
+            }
+        ).then(
+            (data) => callback(null, data.seq),
+            (err) => callback(err, null)
+        );
     };
 }
 
